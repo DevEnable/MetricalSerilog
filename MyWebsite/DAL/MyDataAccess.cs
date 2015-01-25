@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
 using System.Linq;
-using System.Web;
 using Dapper;
 using MyWebsite.Models;
+using Serilog.Context;
 
 namespace MyWebsite.DAL
 {
@@ -26,9 +24,17 @@ namespace MyWebsite.DAL
 
         public Shipper GetShipper(string name)
         {
-            return _connection.Query<Shipper>(
-                "SELECT ShipperId, CompanyName, Phone FROM Shippers WHERE CompanyName = @name",
-                new {name}).SingleOrDefault();
+            // Yet another argument for AOP here...
+            // Could pull this information from the downstream LoggedCommand class by using a StackFrame but this is very brittle and who wants to play with a StackFrame anyway?
+            using (LogContext.PushProperty("CallingType", "MyDataAccess"))
+            {
+                using (LogContext.PushProperty("CallingMethod", "GetShipper"))
+                {
+                    return _connection.Query<Shipper>(
+                        "SELECT ShipperId, CompanyName, Phone FROM Shippers WHERE CompanyName = @name",
+                        new { name }).SingleOrDefault();
+                }
+            }
         }
     }
 }

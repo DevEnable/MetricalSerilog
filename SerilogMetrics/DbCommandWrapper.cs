@@ -1,11 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Web;
+using Serilog;
+using Serilog.Context;
 
 namespace SerilogMetrics
 {
     public class DbCommandWrapper : DbCommand
     {
+        private static readonly Regex _commandTypeRegex = new Regex(@"^(?:\s*)\w+", RegexOptions.Compiled);
         private readonly DbCommand _inner;
 
         public DbCommandWrapper(DbCommand command)
@@ -79,17 +87,90 @@ namespace SerilogMetrics
 
         protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
         {
-            return _inner.ExecuteReader(behavior);
+            using (LogCommandDetails())
+            {
+                return _inner.ExecuteReader(behavior);
+            }
         }
 
         public override int ExecuteNonQuery()
         {
-            return _inner.ExecuteNonQuery();
+            using (LogCommandDetails())
+            {
+                return _inner.ExecuteNonQuery();
+            }
         }
 
         public override object ExecuteScalar()
         {
-            return _inner.ExecuteScalar();
+            using (LogCommandDetails())
+            {
+                return _inner.ExecuteScalar();
+            }
+        }
+
+        private IDisposable LogCommandDetails()
+        {
+            // It would be better to get this through IoC (or a similar mechanism) with lifecycle per request rather than recreating all of the time.
+            var logger = LoggerFactory.GetLoggerConfiguration().CreateLogger();
+
+            var entry = GetLoggedVersionOfCommand();
+            logger.Information("Executing {@Command}", entry);
+
+            return logger.BeginTimedOperation("Database Execution");
+        }
+
+        private LoggedCommand GetLoggedVersionOfCommand()
+        {
+            return new LoggedCommand
+            {
+                CommandText = this.CommandText,
+                CommandType = this.GetCommandType(),
+                LoggedParameters = GetLoggedParameters()
+            };
+
+        }
+
+        private IEnumerable<LoggedParameter> GetLoggedParameters()
+        {
+            List<LoggedParameter> parameters = new List<LoggedParameter>(_inner.Parameters.Count);
+            parameters.AddRange(from DbParameter parameter in _inner.Parameters
+                select new LoggedParameter
+                {
+                    Name = parameter.ParameterName, Value = parameter.Value?.ToString()
+                });
+
+            return parameters;
+        }
+
+
+        private LoggedCommandType GetCommandType()
+        {
+            // Highly simplified version.
+            var match = _commandTypeRegex.Match(this.CommandText);
+
+            if (match.Success)
+            {
+                switch (match.Value.Trim().ToLower())
+                {
+                    case "insert":
+                        return LoggedCommandType.Insert;
+                    case "delete":
+                        return LoggedCommandType.Delete;
+                    case "select":
+                        return LoggedCommandType.Select;
+                    case "update":
+                        return LoggedCommandType.Update;
+                }
+            }
+
+            return LoggedCommandType.Unknown;
+        }
+
+        private struct LoggedCaller
+        {
+            public string Type { get; set; }
+            public string Method { get; set; }
         }
     }
 }

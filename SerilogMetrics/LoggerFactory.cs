@@ -2,12 +2,14 @@
 
 namespace SerilogMetrics
 {
-    public class LoggerFactory
+    public static class LoggerFactory
     {
-        public LoggerConfiguration GetLoggerConfiguration()
+        public static LoggerConfiguration GetLoggerConfiguration()
         {
             return new LoggerConfiguration()
-                .WriteTo.Console()
+                .Enrich.WithThreadId()
+                .Enrich.WithMachineName()
+                .Enrich.FromLogContext()
                 .WriteTo.Seq("http://localhost:5341");
         }
 
