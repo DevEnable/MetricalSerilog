@@ -2,6 +2,7 @@
 using System.Data.Common;
 using System.Linq;
 using Dapper;
+using MyWebsite.Cache;
 using MyWebsite.Models;
 using Serilog.Context;
 
@@ -30,9 +31,23 @@ namespace MyWebsite.DAL
             {
                 using (LogContext.PushProperty("CallingMethod", "GetShipper"))
                 {
-                    return _connection.Query<Shipper>(
+                    Shipper shipper = CacheProvider.GetItem<Shipper>(name);
+
+                    if (shipper != null)
+                    {
+                        return shipper;
+                    }
+
+                    shipper = _connection.Query<Shipper>(
                         "SELECT ShipperId, CompanyName, Phone FROM Shippers WHERE CompanyName = @name",
                         new { name }).SingleOrDefault();
+
+                    if (shipper != null)
+                    {
+                        CacheProvider.PutItem(name, shipper);
+                    }
+
+                    return shipper;
                 }
             }
         }

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Web;
 using Serilog;
 using Serilog.Context;
+using Serilog.Events;
 
 namespace SerilogMetrics
 {
@@ -117,7 +118,8 @@ namespace SerilogMetrics
             var entry = GetLoggedVersionOfCommand();
             logger.Information("Executing {@Command}", entry);
 
-            return logger.BeginTimedOperation("Database Execution");
+            return logger.BeginTimedOperation("Database Execution", null, LogEventLevel.Information, 
+                TimeSpan.FromMilliseconds(10));
         }
 
         private LoggedCommand GetLoggedVersionOfCommand()

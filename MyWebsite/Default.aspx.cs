@@ -11,7 +11,7 @@ namespace MyWebsite
             DbConnection connection = ConnectionFactory.GetConnection();
             MyDataAccess dal = new MyDataAccess(connection);
 
-            dal.GetShipper("speed");
+            dal.GetShipper("Speedy Express");
         }
     }
 }

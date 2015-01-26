@@ -1,5 +1,8 @@
-﻿namespace MyWebsite.Models
+﻿using System;
+
+namespace MyWebsite.Models
 {
+    [Serializable]
     public class Shipper
     {
         public int ShipperId { get; set; }
